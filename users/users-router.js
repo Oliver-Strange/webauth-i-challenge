@@ -3,6 +3,7 @@ const bcrypt = require("bcryptjs");
 
 const db = require("../data/dbConfig");
 const Users = require("./users-model");
+const restricted = require("../auth/restricted-middleware");
 
 const router = express.Router();
 
@@ -29,6 +30,7 @@ router.post("/login", (req, res) => {
     .first()
     .then(user => {
       if (user && bcrypt.compareSync(password, user.password)) {
+        req.session.user = user;
         res.status(200).json({ message: `Welcome ${user.username}!` });
       } else {
         res.status(401).json({ message: "Invalid Credentials" });
@@ -47,25 +49,20 @@ router.get("/", restricted, (req, res) => {
     .catch(err => res.send(err));
 });
 
-// Custom Middleware
-function restricted(req, res, next) {
-  const { username, password } = req.headers;
-  if (username && password) {
-    Users.findBy({ username })
-      .first()
-      .then(user => {
-        if (user && bcrypt.compareSync(password, user.password)) {
-          next();
-        } else {
-          res.status(401).json({ message: "You are not Authorized" });
-        }
-      })
-      .catch(error => {
-        res.status(500).json({ message: "server error" });
-      });
+router.get("/logout", (req, res) => {
+  if (req.session) {
+    req.session.destroy(err => {
+      if (err) {
+        res.json({ message: "server error logging out" });
+      } else {
+        res.status(200).json({ message: "see you next time" });
+      }
+    });
   } else {
-    res.status(400).json({ message: "no credentials provided" });
+    res
+      .status(200)
+      .json({ message: "how did you get here? You don't have an account..." });
   }
-}
+});
 
 module.exports = router;
